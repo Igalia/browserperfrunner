@@ -1,0 +1,41 @@
+#!/bin/bash
+if [[ $# -ne 1 ]]; then
+	echo "Use: ${0} [path-to-local-checkout-webkit-repo]"
+	exit 1
+fi
+WKREPO="${1}"
+if ! test -d "${WKREPO}/Tools/Scripts/"; then
+	echo "${WKREPO} is not a valid WebKit checkout"
+	exit 1
+fi
+echo "This tool will remove all code from current repository and copy the relevant one from ${WKREPO} over it."
+echo "Are you sure you want to continue?"
+echo -n "[y/n] "
+read x
+if [[ "z${x}" != "zy" ]]; then
+	exit 1
+fi
+
+MYDIR="$(dirname $(readlink -f ${0}))"
+cd "${MYDIR}/.."
+REPODIR="$(readlink -f .)"
+if ! test -f "${REPODIR}/devtools/$(basename ${0})" || ! test -d "${REPODIR}/.git"; then
+	echo "Something unexpected happens with the paths. Aborting"
+	exit 1
+fi
+echo "Resetting code ..."
+set -eux
+rm -f run-benchmark  browserperfdash-benchmark
+rm -fr webkitpy
+mkdir -p webkitpy/common
+cd "${WKREPO}/Tools/Scripts/"
+cp browserperfdash-benchmark run-benchmark "${REPODIR}"
+cd webkitpy
+cp __init__.py "${REPODIR}/webkitpy"
+cp -r benchmark_runner browserperfdash "${REPODIR}/webkitpy"
+cd common
+cp __init__.py  memoized.py  memoized_unittest.py  timeout_context.py \
+   timeout_context_unittest.py "${REPODIR}/webkitpy/common"
+set +x
+echo "Done"
+echo "Now run tests with: ./devtools/runtests"
