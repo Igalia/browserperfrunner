@@ -27,15 +27,19 @@ echo "Resetting code ..."
 set -eux
 rm -f run-benchmark  browserperfdash-benchmark
 rm -fr webkitpy
-mkdir -p webkitpy/common
+mkdir -p webkitpy/common/system webkitpy/thirdparty
 cd "${WKREPO}/Tools/Scripts/"
 cp browserperfdash-benchmark run-benchmark "${REPODIR}"
 cd webkitpy
 cp __init__.py "${REPODIR}/webkitpy"
+cp thirdparty/__init__.py "${REPODIR}/webkitpy/thirdparty"
 cp -r benchmark_runner browserperfdash "${REPODIR}/webkitpy"
 cd common
 cp __init__.py  memoized.py  memoized_unittest.py  timeout_context.py \
    timeout_context_unittest.py "${REPODIR}/webkitpy/common"
+cd system
+cp __init__.py  autoinstall.py  filesystem.py filesystem_unittest.py \
+   "${REPODIR}/webkitpy/common/system"
 set +x
 echo "Done"
 echo "Now run tests with: ./devtools/runtests"

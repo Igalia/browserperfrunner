@@ -1,1 +1,6 @@
 *.pyc
+webkitpy/thirdparty/autoinstalled
+geckodriver.log
+Default
+First Run
+Local State
