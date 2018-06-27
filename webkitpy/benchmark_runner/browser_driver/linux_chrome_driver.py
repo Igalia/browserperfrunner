@@ -36,6 +36,9 @@ class LinuxChromeDriver(LinuxBrowserDriver):
     def launch_url(self, url, options, browser_build_path):
         self._browser_arguments = ['--temp-profile', '--start-maximized',
                                    '--homepage', url]
+        # Running as root without --no-sandbox is not supported. See https://crbug.com/638180
+        if os.getuid() == 0:
+            self._browser_arguments = [ '--no-sandbox' ] + self._browser_arguments
         super(LinuxChromeDriver, self).launch_url(url, options, browser_build_path)
 
     def launch_driver(self, url, options, browser_build_path):
