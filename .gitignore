@@ -1,3 +1,5 @@
+*.result
+*.json
 *.pyc
 webkitpy/thirdparty/autoinstalled
 geckodriver.log

@@ -21,6 +21,15 @@ Currently there are two main tools here:
     The idea is to run this continously on a bot with different browser versions.
 
 
+## Dependencies
+
+In the case of Linux, the scripts need the following dependencies installed on the system:
+
+```
+sudo apt-get install curl make patch perl procps psmisc ruby subversion \
+     python2.7 python-psutil python-setuptools python-gobject gir1.2-gtk-3.0
+```
+
 ## Running browserperfdash-benchmark
 
 * This is an example of how to run `browserperfdash-benchmark`
