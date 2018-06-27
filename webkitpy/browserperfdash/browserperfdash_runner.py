@@ -111,7 +111,11 @@ class BrowserPerfDashRunner(object):
 
     def _upload_result(self):
         upload_failed = False
-        for server in self._config_parser.sections():
+        server_sections = self._config_parser.sections()
+        if len(server_sections) < 1:
+            _log.error('The configuration file doesnt have any valid section')
+            upload_failed = True
+        for server in server_sections:
             self._result_data['bot_id'] = self._config_parser.get(server, 'bot_id')
             self._result_data['bot_password'] = self._config_parser.get(server, 'bot_password')
             post_data = urllib.urlencode(self._result_data)
