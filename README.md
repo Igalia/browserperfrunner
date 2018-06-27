@@ -11,6 +11,7 @@ The idea of having this also on a separate repository is to allow running
 this scripts without having to clone the whole WebKit repository (which is huge)
 
 This is specially useful for running benchmarks on embedded boards.
+  * If you are using Yocto, there is a recipe for installing this (and the required deps) in [meta-webkit](https://github.com/Igalia/meta-webkit/blob/master/recipes-benchmark/browserperfrunner/browserperfrunner_git.bb)
 
 Currently there are two main tools here:
 
@@ -31,6 +32,9 @@ sudo apt-get install curl make patch perl procps psmisc ruby subversion \
 ```
 
 ## Running browserperfdash-benchmark
+
+* Assuming that the required dependencies (above) are installed, the
+  scripts can be run directly from the git checkout.
 
 * This is an example of how to run `browserperfdash-benchmark`
 
