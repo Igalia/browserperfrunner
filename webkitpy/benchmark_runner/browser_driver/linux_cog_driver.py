@@ -36,3 +36,11 @@ class CogBrowserDriver(LinuxBrowserDriver):
 
     def launch_driver(self, url, options, browser_build_path):
         raise ValueError("Browser {browser} is not available with webdriver".format(browser=self.browser_name))
+
+
+class CogFdoBrowserDriver(CogBrowserDriver):
+    browser_name = 'cog-fdo'
+
+    def launch_url(self, url, options, browser_build_path):
+        self._browser_arguments = ['--platform=fdo', url]
+        super(CogBrowserDriver, self).launch_url(url, options, browser_build_path)
