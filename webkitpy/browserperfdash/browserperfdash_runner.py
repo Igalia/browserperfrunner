@@ -55,6 +55,7 @@ def parse_args():
     parser.add_argument('--driver', default=WebServerBenchmarkRunner.name, choices=benchmark_runner_subclasses.keys(), help='Use the specified benchmark driver. Defaults to %s.' % WebServerBenchmarkRunner.name)
     parser.add_argument('--local-copy', dest='localCopy', help='Path to a local copy of the benchmark. e.g. PerformanceTests/SunSpider/')
     parser.add_argument('--count', dest='countOverride', type=int, help='Number of times to run the benchmark. e.g. 5')
+    parser.add_argument('--timeout-factor', dest='timeoutFactorOverride', type=int, help='Timeout factor useful to run test in slower devices. e.g. 10')
     mutual_group = parser.add_mutually_exclusive_group(required=True)
     mutual_group.add_argument('--plan', dest='plan', help='Benchmark plan to run. e.g. speedometer, jetstream')
     mutual_group.add_argument('--allplans', action='store_true', help='Run all available benchmark plans sequentially')
@@ -169,7 +170,7 @@ class BrowserPerfDashRunner(object):
                 # Run test and save test info
                 with tempfile.NamedTemporaryFile() as temp_result_file:
                     benchmark_runner_class = benchmark_runner_subclasses[self._args.driver]
-                    runner = benchmark_runner_class(plan, self._args.localCopy, self._args.countOverride, self._args.buildDir, temp_result_file.name, self._args.platform, self._args.browser)
+                    runner = benchmark_runner_class(plan, self._args.localCopy, self._args.timeoutFactorOverride, self._args.countOverride, self._args.buildDir, temp_result_file.name, self._args.platform, self._args.browser)
                     runner.execute()
                     _log.info('Finished benchmark plan: {plan_name}'.format(plan_name=plan))
                     # Fill test info for upload

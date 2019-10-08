@@ -40,8 +40,8 @@ _log = logging.getLogger(__name__)
 class FakeBenchmarkRunner(BenchmarkRunner):
     name = 'fake'
 
-    def __init__(self, plan_file, local_copy, count_override, build_dir, output_file, platform, browser):
-        super(FakeBenchmarkRunner, self).__init__(plan_file, local_copy, count_override, build_dir, output_file, platform, browser)
+    def __init__(self, plan_file, local_copy, timeout_factor, count_override, build_dir, output_file, platform, browser):
+        super(FakeBenchmarkRunner, self).__init__(plan_file, local_copy, timeout_factor, count_override, build_dir, output_file, platform, browser)
 
     def execute(self):
         return True
