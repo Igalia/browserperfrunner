@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Copyright (C) 2018 Igalia S.L.
 #
@@ -26,8 +26,11 @@
 import logging
 import sys
 
-from webkitpy.browserperfdash.browserperfdash_runner import main, format_logger
+from webkitpy.port.linux_container_sdk_utils import maybe_enter_webkit_container_sdk, maybe_use_container_sdk_root_dir
+maybe_enter_webkit_container_sdk()
 
+from webkitpy.browserperfdash.browserperfdash_runner import main, format_logger
+maybe_use_container_sdk_root_dir()
 
 _log = logging.getLogger()
 

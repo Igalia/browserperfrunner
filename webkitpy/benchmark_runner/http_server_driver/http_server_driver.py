@@ -1,12 +1,8 @@
-#!/usr/bin/env python
-
-from abc import abstractmethod, ABCMeta
+from abc import ABCMeta, abstractmethod
 
 
-class HTTPServerDriver(object):
+class HTTPServerDriver(metaclass=ABCMeta):
     platforms = []
-
-    __metaclass__ = ABCMeta
 
     @abstractmethod
     def serve(self, webRoot):
@@ -26,4 +22,7 @@ class HTTPServerDriver(object):
 
     @abstractmethod
     def set_device_id(self, device_id):
+        pass
+
+    def set_http_log(self, log_path):
         pass

@@ -1,12 +1,11 @@
-#!/usr/bin/env python
-
 import logging
 import os
+import sys
+import re
 import subprocess
 import time
 
-from osx_browser_driver import OSXBrowserDriver
-from webkitpy.benchmark_runner.utils import force_remove
+from webkitpy.benchmark_runner.browser_driver.osx_browser_driver import OSXBrowserDriver
 
 
 _log = logging.getLogger(__name__)
@@ -15,37 +14,97 @@ _log = logging.getLogger(__name__)
 class OSXSafariDriver(OSXBrowserDriver):
     process_name = 'Safari'
     browser_name = 'safari'
+    bundle_id = 'com.apple.Safari'
 
     def prepare_env(self, config):
         self._safari_process = None
+        self._safari_preferences = ["-HomePage", "about:blank", "-WarnAboutFraudulentWebsites", "0", "-ExtensionsEnabled", "0", "-ShowStatusBar", "0", "-NewWindowBehavior", "1", "-NewTabBehavior", "1", "-AlwaysRestoreSessionAtLaunch", "0", "-ApplePersistenceIgnoreStateQuietly", "1"]
         super(OSXSafariDriver, self).prepare_env(config)
-        force_remove(os.path.join(os.path.expanduser('~'), 'Library/Saved Application State/com.apple.Safari.savedState'))
-        force_remove(os.path.join(os.path.expanduser('~'), 'Library/Safari/LastSession.plist'))
+        self._enable_signposts = config["enable_signposts"]
         self._maximize_window()
-        self._safari_preferences = ["-HomePage", "about:blank", "-WarnAboutFraudulentWebsites", "0", "-ExtensionsEnabled", "0", "-ShowStatusBar", "0", "-NewWindowBehavior", "1", "-NewTabBehavior", "1"]
 
-    def launch_url(self, url, options, browser_build_path):
-        args = ['/Applications/Safari.app/Contents/MacOS/Safari']
+    def launch_url(self, url, options, browser_build_path, browser_path):
         env = {}
-        if browser_build_path:
-            safari_app_in_build_path = os.path.join(browser_build_path, 'Safari.app/Contents/MacOS/Safari')
-            if os.path.exists(safari_app_in_build_path):
-                args = [safari_app_in_build_path]
-                env = {'DYLD_FRAMEWORK_PATH': browser_build_path, 'DYLD_LIBRARY_PATH': browser_build_path, '__XPC_DYLD_FRAMEWORK_PATH': browser_build_path, '__XPC_DYLD_LIBRARY_PATH': browser_build_path}
-            else:
-                _log.info('Could not find Safari.app at %s, using the system Safari instead' % safari_app_in_build_path)
+        for key, value in os.environ.items():
+            if re.match(r'^__XPC_', key):
+                env[key] = value
+        if self._enable_signposts:
+            env['WEBKIT_SIGNPOSTS_ENABLED'] = '1'
+            env['__XPC_WEBKIT_SIGNPOSTS_ENABLED'] = '1'
+            env['__XPC_JSC_exposeProfilersOnGlobalObject'] = '1'
+            env['__XPC_WebKitPerformanceSignpostEnabled'] = '1'
+        if browser_build_path or browser_path:
+            self._launch_url_with_custom_path(url, options, browser_build_path, browser_path, env)
+            return
+        self._safari_process = self._launch_process(None, 'Safari.app', url, ['--url', url, '--args'] + self._safari_preferences, env=env)
 
-        args.extend(self._safari_preferences)
-        _log.info('Launching safari: %s with url: %s' % (args[0], url))
-        self._safari_process = OSXSafariDriver._launch_process_with_caffinate(args, env)
+    def _launch_url_with_custom_path(self, url, options, browser_build_path, browser_path, env):
+        safari_app_path = '/Applications/Safari.app'
+        safari_binary_path = os.path.join(safari_app_path, 'Contents/MacOS/Safari')
+
+        _log.info('WARNING: Using custom paths to launch Safari (--browser-path or --build-directory) can return inaccurate results if the test is run remotely.')
+
+        if browser_build_path:
+            browser_build_absolute_path = os.path.abspath(browser_build_path)
+            safari_app_path = os.path.join(browser_build_absolute_path, 'Safari.app')
+            safari_binary_path = os.path.join(safari_app_path, 'Contents/MacOS/Safari')
+            has_safari_binary = os.path.exists(safari_binary_path)
+            contains_frameworks = any(map(lambda entry: entry.endswith('.framework'), os.listdir(browser_build_absolute_path)))
+
+            if contains_frameworks:
+                env['DYLD_FRAMEWORK_PATH'] = browser_build_absolute_path
+                env['DYLD_LIBRARY_PATH'] = browser_build_absolute_path
+                env['__XPC_DYLD_FRAMEWORK_PATH'] = browser_build_absolute_path
+                env['__XPC_DYLD_LIBRARY_PATH'] = browser_build_absolute_path
+            elif not has_safari_binary:
+                raise Exception('Could not find any framework "{}"'.format(browser_build_path))
+
+        elif browser_path:
+            browser_path = os.path.abspath(browser_path)
+            safari_binary_path = os.path.join(browser_path, 'Contents/MacOS/Safari')
+            if os.path.exists(safari_binary_path):
+                safari_app_path = browser_path
+            else:
+                raise Exception('Could not find Safari.app at {}'.format(browser_path))
+
+        args = [safari_binary_path] + self._safari_preferences
+        _log.info('Launching safari: %s with url: %s' % (safari_binary_path, url))
+        try:
+            self._safari_process = subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as error:
+            _log.error('Popen failed: {error}'.format(error=error))
+
+        max_wait_iteration = 60
+        for _ in range(max_wait_iteration):
+            if not subprocess.call(['/usr/bin/pgrep', 'WebContent(.Development)?$'], stdout=subprocess.DEVNULL):
+                _log.info('WebContent process has been launched')
+                break
+            time.sleep(1)
+        else:
+            _log.warning(f'WebContent process is not launched within expected time, proceed anyway but test may fail.')
 
         # Stop for initialization of the safari process, otherwise, open
         # command may use the system safari.
         time.sleep(3)
-        subprocess.Popen(['open', '-a', args[0], url])
+
+        if browser_build_path:
+            _log.info('Checking if any open file is from "{}".'.format(browser_build_path))
+            # Cannot use 'check_call' here as '+D' option will have non-zero return code when not all files under
+            # specified folder are used.
+            process = subprocess.Popen(
+                ['/usr/sbin/lsof', '-a', '-p', str(self._safari_process.pid), '+D', browser_build_absolute_path],
+                stdout=subprocess.PIPE,
+                encoding='utf-8',
+            )
+            output = process.communicate()[0]
+            if has_safari_binary:
+                assert 'Safari.app/Contents/MacOS/Safari' in output, 'Safari.app is not launched from "{}"'.format(browser_build_path)
+            if contains_frameworks:
+                assert '.framework' in output, 'No framework is loaded from "{}"'.format(browser_build_path)
+
+        subprocess.Popen(['open', '-a', safari_app_path, url], env=env)
 
     def launch_driver(self, url, options, browser_build_path):
-        import webkitpy.thirdparty.autoinstalled.selenium
         from selenium import webdriver
         driver = webdriver.Safari(quiet=False)
         self._launch_webdriver(url=url, driver=driver)
@@ -54,7 +113,7 @@ class OSXSafariDriver(OSXBrowserDriver):
     def close_browsers(self):
         super(OSXSafariDriver, self).close_browsers()
         if self._safari_process and self._safari_process.returncode:
-            sys.exit('Browser crashed with exitcode %d' % self._process.returncode)
+            sys.exit('Browser crashed with exitcode %d' % self._safari_process.returncode)
 
     @classmethod
     def _maximize_window(cls):
@@ -62,3 +121,7 @@ class OSXSafariDriver(OSXBrowserDriver):
             subprocess.check_call(['/usr/bin/defaults', 'write', 'com.apple.Safari', 'NSWindow Frame BrowserWindowFrame', ' '.join(['0', '0', str(cls._screen_size().width), str(cls._screen_size().height)] * 2)])
         except Exception as error:
             _log.error('Reset safari window size failed - Error: {}'.format(error))
+
+    @property
+    def pgo_profile_output_directories(self):
+        return ['/private/tmp/WebKitPGO']

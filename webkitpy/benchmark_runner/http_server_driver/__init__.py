@@ -12,10 +12,9 @@
 # allows different callers to choose different initialization code,
 # as necessary.
 import os
-import imp
 
 from webkitpy.benchmark_runner.utils import load_subclasses
-from http_server_driver_factory import HTTPServerDriverFactory
+from webkitpy.benchmark_runner.http_server_driver.http_server_driver_factory import HTTPServerDriverFactory
 
 
 def http_server_driver_loader(http_server_driver_class):

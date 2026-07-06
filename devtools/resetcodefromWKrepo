@@ -26,20 +26,122 @@ fi
 echo "Resetting code ..."
 set -eux
 rm -f run-benchmark  browserperfdash-benchmark
-rm -fr webkitpy
-mkdir -p webkitpy/common/system webkitpy/thirdparty
+rm -rf libraries webkitpy
 cd "${WKREPO}/Tools/Scripts/"
+
 cp browserperfdash-benchmark run-benchmark "${REPODIR}"
-cd webkitpy
-cp __init__.py "${REPODIR}/webkitpy"
-cp thirdparty/__init__.py "${REPODIR}/webkitpy/thirdparty"
-cp -r benchmark_runner browserperfdash "${REPODIR}/webkitpy"
-cd common
-cp __init__.py  memoized.py  memoized_unittest.py  timeout_context.py \
-   timeout_context_unittest.py "${REPODIR}/webkitpy/common"
-cd system
-cp __init__.py  autoinstall.py  filesystem.py filesystem_unittest.py \
-   "${REPODIR}/webkitpy/common/system"
+
+# Local python libraries. webkitpy/__init__.py registers all of them as local
+# AutoInstall packages (and imports webkitscmpy), so the four are required.
+for library in webkitcorepy webkitscmpy webkitbugspy webkitexpectationspy; do
+	mkdir -p "${REPODIR}/libraries/${library}"
+	cp -r "libraries/${library}/${library}" "${REPODIR}/libraries/${library}/"
+done
+
+# Main packages, copied wholesale (plans, patches and drivers are loaded
+# dynamically from these directories).
+mkdir -p "${REPODIR}/webkitpy"
+cp webkitpy/__init__.py "${REPODIR}/webkitpy/"
+cp -r webkitpy/benchmark_runner webkitpy/browserperfdash "${REPODIR}/webkitpy/"
+
+# The rest is the transitive import closure of the two entry-point scripts and
+# the two packages above, plus the port modules that PortFactory loads
+# dynamically on Linux (gtk, wpe: needed by the browser-binary-size plan).
+
+mkdir -p "${REPODIR}/webkitpy/autoinstalled"
+cp webkitpy/autoinstalled/__init__.py webkitpy/autoinstalled/chromedriver.py \
+    webkitpy/autoinstalled/geckodriver.py webkitpy/autoinstalled/pyobjc_frameworks.py \
+    webkitpy/autoinstalled/twisted.py "${REPODIR}/webkitpy/autoinstalled/"
+
+mkdir -p "${REPODIR}/webkitpy/binary_bundling"
+cp webkitpy/binary_bundling/__init__.py webkitpy/binary_bundling/ldd.py "${REPODIR}/webkitpy/binary_bundling/"
+
+mkdir -p "${REPODIR}/webkitpy/common"
+cp webkitpy/common/__init__.py webkitpy/common/editdistance.py webkitpy/common/host.py \
+    webkitpy/common/iteration_compatibility.py webkitpy/common/memoized.py \
+    webkitpy/common/memoized_unittest.py webkitpy/common/prettypatch.py \
+    webkitpy/common/version_name_map.py webkitpy/common/wavediff.py \
+    webkitpy/common/webkit_finder.py "${REPODIR}/webkitpy/common/"
+
+mkdir -p "${REPODIR}/webkitpy/common/checkout"
+cp webkitpy/common/checkout/__init__.py webkitpy/common/checkout/changelog.py \
+    webkitpy/common/checkout/checkout.py webkitpy/common/checkout/commitinfo.py \
+    webkitpy/common/checkout/diff_parser.py "${REPODIR}/webkitpy/common/checkout/"
+
+mkdir -p "${REPODIR}/webkitpy/common/checkout/scm"
+cp webkitpy/common/checkout/scm/__init__.py webkitpy/common/checkout/scm/commitmessage.py \
+    webkitpy/common/checkout/scm/detection.py webkitpy/common/checkout/scm/git.py \
+    webkitpy/common/checkout/scm/scm.py webkitpy/common/checkout/scm/stub_repository.py \
+    "${REPODIR}/webkitpy/common/checkout/scm/"
+
+mkdir -p "${REPODIR}/webkitpy/common/config"
+cp webkitpy/common/config/__init__.py webkitpy/common/config/committers.py \
+    webkitpy/common/config/urls.py "${REPODIR}/webkitpy/common/config/"
+
+# common/net/bugzilla and common/net/buildbot are NOT copied on purpose: they are
+# only reachable through the lazy host.bugs/host.buildbot properties (never used
+# when running benchmarks) and bugzilla cannot even be imported outside a WebKit
+# checkout (it reads metadata/contributors.json at import time).
+mkdir -p "${REPODIR}/webkitpy/common/net"
+cp webkitpy/common/net/__init__.py webkitpy/common/net/networktransaction.py \
+    webkitpy/common/net/web.py "${REPODIR}/webkitpy/common/net/"
+
+mkdir -p "${REPODIR}/webkitpy/common/system"
+cp webkitpy/common/system/__init__.py webkitpy/common/system/abstractexecutive.py \
+    webkitpy/common/system/environment.py webkitpy/common/system/executive.py \
+    webkitpy/common/system/filesystem.py webkitpy/common/system/filesystem_unittest.py \
+    webkitpy/common/system/logutils.py webkitpy/common/system/outputtee.py \
+    webkitpy/common/system/path.py webkitpy/common/system/pemfile.py \
+    webkitpy/common/system/platforminfo.py webkitpy/common/system/profiler.py \
+    webkitpy/common/system/systemhost.py webkitpy/common/system/user.py \
+    webkitpy/common/system/workspace.py "${REPODIR}/webkitpy/common/system/"
+
+mkdir -p "${REPODIR}/webkitpy/common/watchlist"
+cp webkitpy/common/watchlist/__init__.py webkitpy/common/watchlist/amountchangedpattern.py \
+    webkitpy/common/watchlist/changedlinepattern.py webkitpy/common/watchlist/filenamepattern.py \
+    webkitpy/common/watchlist/watchlist.py webkitpy/common/watchlist/watchlistparser.py \
+    webkitpy/common/watchlist/watchlistrule.py "${REPODIR}/webkitpy/common/watchlist/"
+
+mkdir -p "${REPODIR}/webkitpy/layout_tests"
+cp webkitpy/layout_tests/__init__.py "${REPODIR}/webkitpy/layout_tests/"
+
+mkdir -p "${REPODIR}/webkitpy/layout_tests/layout_package"
+cp webkitpy/layout_tests/layout_package/__init__.py \
+    webkitpy/layout_tests/layout_package/json_results_generator.py \
+    "${REPODIR}/webkitpy/layout_tests/layout_package/"
+
+mkdir -p "${REPODIR}/webkitpy/layout_tests/models"
+cp webkitpy/layout_tests/models/__init__.py webkitpy/layout_tests/models/test.py \
+    webkitpy/layout_tests/models/test_configuration.py \
+    webkitpy/layout_tests/models/test_expectations.py webkitpy/layout_tests/models/test_failures.py \
+    webkitpy/layout_tests/models/test_input.py webkitpy/layout_tests/models/test_results.py \
+    "${REPODIR}/webkitpy/layout_tests/models/"
+
+mkdir -p "${REPODIR}/webkitpy/layout_tests/servers"
+cp webkitpy/layout_tests/servers/__init__.py webkitpy/layout_tests/servers/apache_http_server.py \
+    webkitpy/layout_tests/servers/basic_dns_server.py \
+    webkitpy/layout_tests/servers/http_server_base.py \
+    webkitpy/layout_tests/servers/web_platform_test_server.py \
+    webkitpy/layout_tests/servers/websocket_server.py "${REPODIR}/webkitpy/layout_tests/servers/"
+
+mkdir -p "${REPODIR}/webkitpy/port"
+cp webkitpy/port/__init__.py webkitpy/port/base.py webkitpy/port/config.py webkitpy/port/driver.py \
+    webkitpy/port/factory.py webkitpy/port/glib.py webkitpy/port/gtk.py \
+    webkitpy/port/headlessdriver.py webkitpy/port/image_diff.py \
+    webkitpy/port/leakdetector_valgrind.py webkitpy/port/linux_container_sdk_utils.py \
+    webkitpy/port/linux_get_crash_log.py webkitpy/port/server_process.py \
+    webkitpy/port/waylanddriver.py webkitpy/port/westondriver.py webkitpy/port/wpe.py \
+    webkitpy/port/xorgdriver.py webkitpy/port/xvfbdriver.py "${REPODIR}/webkitpy/port/"
+
+mkdir -p "${REPODIR}/webkitpy/results"
+cp webkitpy/results/__init__.py webkitpy/results/upload.py "${REPODIR}/webkitpy/results/"
+
+mkdir -p "${REPODIR}/webkitpy/thirdparty"
+cp webkitpy/thirdparty/__init__.py "${REPODIR}/webkitpy/thirdparty/"
+
+# Do not carry over compiled caches from the WebKit checkout
+find "${REPODIR}/webkitpy" "${REPODIR}/libraries" -type d -name __pycache__ -prune -exec rm -rf {} +
+
 set +x
 echo "Done"
 echo "Now run tests with: ./devtools/runtests"

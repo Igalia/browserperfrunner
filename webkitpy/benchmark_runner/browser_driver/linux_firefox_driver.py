@@ -26,22 +26,21 @@
 
 import os
 
-from linux_browser_driver import LinuxBrowserDriver
+from webkitpy.benchmark_runner.browser_driver.linux_browser_driver import LinuxBrowserDriver
 
 
 class LinuxFirefoxDriver(LinuxBrowserDriver):
     browser_name = 'firefox'
     process_search_list = ['firefox', 'firefox-bin']
 
-    def launch_url(self, url, options, browser_build_path):
-        self._browser_arguments = ['-new-instance', '-profile', self._temp_profiledir,
+    def launch_url(self, url, options, browser_build_path, browser_path):
+        self._default_browser_arguments = ['-new-instance', '-profile', self._temp_profiledir,
                                    '-width', str(self._screen_size().width),
                                    '-height', str(self._screen_size().height),
                                    url]
-        super(LinuxFirefoxDriver, self).launch_url(url, options, browser_build_path)
+        super(LinuxFirefoxDriver, self).launch_url(url, options, browser_build_path, browser_path)
 
     def launch_driver(self, url, options, browser_build_path):
-        import webkitpy.thirdparty.autoinstalled.selenium
         from selenium import webdriver
         from selenium.webdriver.firefox.options import Options
         options = Options()
