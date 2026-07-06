@@ -24,19 +24,51 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from linux_browser_driver import LinuxBrowserDriver
+from webkitpy.benchmark_runner.browser_driver.linux_browser_driver import LinuxBrowserDriver
 
 
-class WPEMiniBrowserDriver(LinuxBrowserDriver):
-    browser_name = 'minibrowser-wpe'
+class WPEMiniBrowserBaseDriver(LinuxBrowserDriver):
     process_search_list = ['Tools/Scripts/run-minibrowser', 'MiniBrowser']
 
-    def launch_url(self, url, options, browser_build_path):
-        self._browser_arguments = []
+    def _extra_wpe_minibrowser_args(self):
+        return []
+
+    def launch_url(self, url, options, browser_build_path, browser_path):
+        self._default_browser_arguments = []
         if self.process_name.endswith('run-minibrowser'):
-            self._browser_arguments.append('--wpe')
-        self._browser_arguments.append(url)
-        super(WPEMiniBrowserDriver, self).launch_url(url, options, browser_build_path)
+            self._default_browser_arguments.extend(['--wpe', '--'])
+        self._default_browser_arguments.extend(self._extra_wpe_minibrowser_args())
+        if self.browser_args:
+            self._default_browser_arguments.extend(self.browser_args)
+            self.browser_args = []
+        self._default_browser_arguments.append(url)
+        super().launch_url(url, options, browser_build_path, browser_path)
 
     def launch_driver(self, url, options, browser_build_path):
         raise ValueError("Browser {browser} is not available with webdriver".format(browser=self.browser_name))
+
+    def prepare_env(self, config):
+        super().prepare_env(config)
+        self._test_environ['WPE_BROWSER'] = 'minibrowser'
+
+
+class WPEMiniBrowserDriver(WPEMiniBrowserBaseDriver):
+    browser_name = 'minibrowser-wpe'
+
+    def _extra_wpe_minibrowser_args(self):
+        return ['--fullscreen']
+
+
+class WPEMiniBrowserSkiaCPUDriver(WPEMiniBrowserDriver):
+    browser_name = 'minibrowser-wpe-skiacpu'
+
+    def prepare_env(self, config):
+        super().prepare_env(config)
+        self._test_environ['WEBKIT_SKIA_ENABLE_CPU_RENDERING'] = '1'
+
+
+class WPEMiniBrowserLegacyAPIDriver(WPEMiniBrowserBaseDriver):
+    browser_name = 'minibrowser-wpe-legacy'
+
+    def _extra_wpe_minibrowser_args(self):
+        return ['--use-legacy-api', '--fullscreen']

@@ -1,8 +1,12 @@
 *.result
 *.json
+!libraries/webkitscmpy/webkitscmpy/mocks/*.json
 *.pyc
+__pycache__/
 webkitpy/thirdparty/autoinstalled
+libraries/autoinstalled
 geckodriver.log
 Default
 First Run
 Local State
+*.swp

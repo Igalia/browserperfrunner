@@ -30,7 +30,6 @@
 
 import codecs
 import errno
-import exceptions
 import filecmp
 import glob
 import hashlib
@@ -40,14 +39,18 @@ import sys
 import tempfile
 import time
 
+from webkitcorepy import string_utils
+
 
 class FileSystem(object):
     """FileSystem interface for webkitpy.
 
     Unless otherwise noted, all paths are allowed to be either absolute
     or relative."""
-    sep = os.sep
-    pardir = os.pardir
+
+    def __init__(self):
+        self.sep = os.sep
+        self.pardir = os.pardir
 
     def abspath(self, path):
         # FIXME: This gross hack is needed while we transition from Cygwin to native Windows, because we
@@ -79,7 +82,10 @@ class FileSystem(object):
         return os.chdir(path)
 
     def copyfile(self, source, destination):
-        shutil.copyfile(source, destination)
+        return shutil.copyfile(source, destination)
+
+    def copymode(self, source, destination):
+        return shutil.copymode(source, destination)
 
     def dirname(self, path):
         return os.path.dirname(path)
@@ -95,12 +101,17 @@ class FileSystem(object):
                 with the filesystem object and the path of each dirfound.
                 The dir is included in the result if the callback returns True.
         """
+
         def filter_all(fs, dirpath):
             return True
+
         dir_filter = dir_filter or filter_all
 
         dirs = []
-        for (dirpath, dirnames, filenames) in os.walk(path):
+
+        it = os.walk(path)
+
+        for dirpath, dirnames, filenames in it:
             if dir_filter(self, dirpath):
                 dirs.append(dirpath)
         return dirs
@@ -116,6 +127,7 @@ class FileSystem(object):
                 each file found. The file is included in the result if the
                 callback returns True.
         """
+
         def filter_all(fs, dirpath, basename):
             return True
 
@@ -129,7 +141,9 @@ class FileSystem(object):
         if self.basename(path) in dirs_to_skip:
             return []
 
-        for (dirpath, dirnames, filenames) in os.walk(path):
+        it = os.walk(path)
+
+        for dirpath, dirnames, filenames in it:
             for d in dirs_to_skip:
                 if d in dirnames:
                     dirnames.remove(d)
@@ -142,8 +156,8 @@ class FileSystem(object):
     def getcwd(self):
         return os.getcwd()
 
-    def glob(self, path):
-        return glob.glob(path)
+    def glob(self, path, recursive=False):
+        return glob.glob(path, recursive=recursive)
 
     def isabs(self, path):
         return os.path.isabs(path)
@@ -157,11 +171,17 @@ class FileSystem(object):
     def isdir(self, path):
         return os.path.isdir(path)
 
+    def islink(self, path):
+        return os.path.islink(path)
+
     def join(self, *comps):
         return os.path.join(*comps)
 
     def listdir(self, path):
         return os.listdir(path)
+
+    def scandir(self, path):
+        return os.scandir(path)
 
     def mkdtemp(self, **kwargs):
         """Create and return a uniquely named directory.
@@ -175,6 +195,7 @@ class FileSystem(object):
         Note that the object returned is not a string and does not support all of the string
         methods. If you need a string, coerce the object to a string and go from there.
         """
+
         class TemporaryDirectory(object):
             def __init__(self, filesystem, **kwargs):
                 self._filesystem = filesystem
@@ -210,6 +231,9 @@ class FileSystem(object):
     def normpath(self, path):
         return os.path.normpath(path)
 
+    def symlink(self, src, dst):
+        return os.symlink(src, dst)
+
     def open_binary_tempfile(self, suffix):
         """Create, open, and return a binary temp file. Returns a tuple of the file and the name."""
         temp_fd, temp_name = tempfile.mkstemp(suffix)
@@ -221,12 +245,12 @@ class FileSystem(object):
 
     def read_binary_file(self, path):
         """Return the contents of the file at the given path as a byte string."""
-        with file(path, 'rb') as f:
+        with open(path, 'rb') as f:
             return f.read()
 
     def write_binary_file(self, path, contents):
-        with file(path, 'wb') as f:
-            f.write(contents)
+        with open(path, 'wb') as f:
+            f.write(string_utils.encode(contents, target_type=bytes))
 
     def open_text_file_for_reading(self, path, errors='strict'):
         # Note: There appears to be an issue with the returned file objects
@@ -256,7 +280,7 @@ class FileSystem(object):
 
         The file is written encoded as UTF-8 with no BOM."""
         with codecs.open(path, 'w', 'utf-8', errors=errors) as f:
-            f.write(contents.decode('utf-8', errors=errors) if type(contents) == str else contents)
+            f.write(string_utils.decode(contents, errors=errors))
 
     def sha1(self, path):
         contents = self.read_binary_file(path)
@@ -265,19 +289,18 @@ class FileSystem(object):
     def relpath(self, path, start='.'):
         return os.path.relpath(path, start)
 
-    class _WindowsError(exceptions.OSError):
-        """Fake exception for Linux and Mac."""
-        pass
-
-    def remove(self, path, osremove=os.remove):
+    def remove(self, path, osremove=None):
         """On Windows, if a process was recently killed and it held on to a
         file, the OS will hold on to the file for a short while.  This makes
         attempts to delete the file fail.  To work around that, this method
         will retry for a few seconds until Windows is done with the file."""
         try:
-            exceptions.WindowsError
-        except AttributeError:
-            exceptions.WindowsError = FileSystem._WindowsError
+            WinOSError = WindowsError
+        except NameError:
+            WinOSError = OSError
+
+        if osremove is None:
+            osremove = os.remove
 
         retry_timeout_sec = 3.0
         sleep_interval = 0.1
@@ -285,7 +308,7 @@ class FileSystem(object):
             try:
                 osremove(path)
                 return True
-            except exceptions.WindowsError as e:
+            except WinOSError as e:
                 time.sleep(sleep_interval)
                 retry_timeout_sec -= sleep_interval
                 if retry_timeout_sec < 0:

@@ -37,7 +37,7 @@ import sys
 import tempfile
 import unittest
 
-from filesystem import FileSystem
+from webkitpy.common.system.filesystem import FileSystem
 
 
 class GenericFileSystemTests(object):
@@ -51,6 +51,8 @@ class GenericFileSystemTests(object):
         fs.write_text_file('foobar', 'foobar')
         fs.maybe_make_directory('foodir')
         fs.write_text_file(fs.join('foodir', 'baz'), 'baz')
+        fs.maybe_make_directory(fs.join('foodir', 'subdir'))
+        fs.write_text_file(fs.join('foodir', 'subdir', 'deep'), 'deep')
         fs.chdir(self.orig_cwd)
 
     def teardown_generic_test_dir(self):
@@ -73,6 +75,16 @@ class GenericFileSystemTests(object):
     def test_glob__period_is_escaped(self):
         self.fs.chdir(self.generic_test_dir)
         self.assertEqual(set(self.fs.glob('foo.*')), set(['foo.txt']))
+
+    def test_glob__double_star_recursive(self):
+        self.fs.chdir(self.generic_test_dir)
+        self.addCleanup(self.fs.chdir, self.orig_cwd)
+        self.assertEqual(set(self.fs.glob('**/deep', recursive=True)), {'foodir/subdir/deep'})
+
+    def test_glob__double_star_default_non_recursive(self):
+        self.fs.chdir(self.generic_test_dir)
+        self.addCleanup(self.fs.chdir, self.orig_cwd)
+        self.assertEqual(self.fs.glob('**/deep'), [])
 
 
 class RealFileSystemTest(unittest.TestCase, GenericFileSystemTests):
@@ -267,9 +279,9 @@ class RealFileSystemTest(unittest.TestCase, GenericFileSystemTests):
         binary_path = None
 
         unicode_text_string = u'\u016An\u012Dc\u014Dde\u033D'
-        hex_equivalent = '\xC5\xAA\x6E\xC4\xAD\x63\xC5\x8D\x64\x65\xCC\xBD'
-        malformed_text_hex = '\x4D\x69\x63\x72\x6F\x73\x6F\x66\x74\xAE\x20\x56\x69\x73\x75\x61\x6C\x20\x53\x74\x75\x64\x69\x6F\xAE\x20\x32\x30\x31\x30\x0D\x0A'
-        malformed_ignored_text_hex = '\x4D\x69\x63\x72\x6F\x73\x6F\x66\x74\x20\x56\x69\x73\x75\x61\x6C\x20\x53\x74\x75\x64\x69\x6F\x20\x32\x30\x31\x30\x0D\x0A'
+        hex_equivalent = b'\xC5\xAA\x6E\xC4\xAD\x63\xC5\x8D\x64\x65\xCC\xBD'
+        malformed_text_hex = b'\x4D\x69\x63\x72\x6F\x73\x6F\x66\x74\xAE\x20\x56\x69\x73\x75\x61\x6C\x20\x53\x74\x75\x64\x69\x6F\xAE\x20\x32\x30\x31\x30\x0D\x0A'
+        malformed_ignored_text_hex = b'\x4D\x69\x63\x72\x6F\x73\x6F\x66\x74\x20\x56\x69\x73\x75\x61\x6C\x20\x53\x74\x75\x64\x69\x6F\x20\x32\x30\x31\x30\x0D\x0A'
         try:
             text_path = tempfile.mktemp(prefix='tree_unittest_')
             binary_path = tempfile.mktemp(prefix='tree_unittest_')
@@ -285,8 +297,9 @@ class RealFileSystemTest(unittest.TestCase, GenericFileSystemTests):
             fs.write_binary_file(binary_path, malformed_text_hex)
             self.assertRaises(ValueError, fs.read_text_file, binary_path)
             text_contents = fs.read_binary_file(binary_path).decode('utf8', 'ignore')
-            self.assertEquals(text_contents, malformed_ignored_text_hex)
-            fs.open_text_file_for_reading(binary_path, 'replace').readline()
+            self.assertEqual(text_contents, malformed_ignored_text_hex.decode('utf8', 'ignore'))
+            with fs.open_text_file_for_reading(binary_path, 'replace') as file:
+                file.readline()
 
         finally:
             if text_path and fs.isfile(text_path):
@@ -311,7 +324,7 @@ class RealFileSystemTest(unittest.TestCase, GenericFileSystemTests):
                 try:
                     raise WindowsError
                 except NameError:
-                    raise FileSystem._WindowsError
+                    raise OSError
 
         fs = FileSystem()
         self.assertTrue(fs.remove('filename', remove_with_exception))

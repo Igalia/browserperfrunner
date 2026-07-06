@@ -24,18 +24,18 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from linux_browser_driver import LinuxBrowserDriver
+from webkitpy.benchmark_runner.browser_driver.linux_browser_driver import LinuxBrowserDriver
 
 
 class EpiphanyBrowserDriver(LinuxBrowserDriver):
     browser_name = 'epiphany'
     process_search_list = ['epiphany', 'epiphany-browser']
 
-    def launch_url(self, url, options, browser_build_path):
-        self._browser_arguments = ['--new-window', '-p',
+    def launch_url(self, url, options, browser_build_path, browser_path):
+        self._default_browser_arguments = ['--new-window', '-p',
                                    '--profile={profile}'.format(profile=self._temp_profiledir),
                                    url]
-        super(EpiphanyBrowserDriver, self).launch_url(url, options, browser_build_path)
+        super(EpiphanyBrowserDriver, self).launch_url(url, options, browser_build_path, browser_path)
 
     def launch_driver(self, url, options, browser_build_path):
         raise ValueError("Browser {browser} is not available with webdriver".format(browser=self.browser_name))

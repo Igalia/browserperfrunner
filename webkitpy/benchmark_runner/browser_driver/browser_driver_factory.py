@@ -1,10 +1,3 @@
-#!/usr/bin/env python
-
-import logging
-import json
-import os
-
-
 class BrowserDriverFactory(object):
 
     browser_drivers = {}
@@ -28,7 +21,10 @@ class BrowserDriverFactory(object):
         cls.browser_drivers[platform][browser_name] = browser_driver_class
 
     @classmethod
-    def create(cls, platform, browser_name):
+    def create(cls, platform, browser_name, browser_args):
         if browser_name not in cls.browser_drivers[platform]:
-            raise ValueError("Browser \"%s\" is not available on platform \"%s\"" % (browser_name, platform))
-        return cls.browser_drivers[platform][browser_name]()
+            if 'all' in cls.browser_drivers and browser_name in cls.browser_drivers['all']:
+                platform = 'all'
+            else:
+                raise ValueError("Browser \"%s\" is not available on platform \"%s\"" % (browser_name, platform))
+        return cls.browser_drivers[platform][browser_name](browser_args)
